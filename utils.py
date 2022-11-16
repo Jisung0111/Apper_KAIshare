@@ -470,7 +470,7 @@ def update_userinfo(args):
         elif password == args["password"]:
             if not chk_len(args["username"], 1, 25):
                 raise Exception("UpdateUserInfo: Invalid Username (Length should be in [1, 25])");
-            if len("SELECT Email FROM UserInfo WHERE BINARY Username = %s", args["username"]) != 0:
+            if len(result("SELECT Email FROM UserInfo WHERE BINARY Username = %s", args["username"])) != 0:
                 raise Exception("UpdateUserInfo: Already Existing User Name ({})".format(args["username"]));
             commit("UPDATE UserInfo SET Username = %s WHERE BINARY Email = %s", (args["username"], args["email"]));
         elif username == args["username"]:
