@@ -306,7 +306,7 @@ def register_verify(args):
         if len(result("SELECT Email FROM Register WHERE BINARY Email = %s AND BINARY Password = %s AND BINARY Username = %s AND Code = %s",
                (args["email"], args["password"], username, args["code"]))) != 0:
             commit("DELETE FROM Register WHERE BINARY Email = %s AND BINARY Password = %s", (args["email"], args["password"]));
-            commit("INSERT INTO UserInfo(Email, Password) VALUES (%s, %s)", (args["email"], args["password"]));
+            commit("INSERT INTO UserInfo(Email, Password, Username) VALUES (%s, %s, %s)", (args["email"], args["password"], username));
             return success();
         else:
             commit("UPDATE Register SET TimeLimit = %s WHERE BINARY Email = %s AND BINARY Password = %s",
