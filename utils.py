@@ -221,7 +221,7 @@ def save_result(args):
         f.write("output: {}\n\n".format(json.dumps(args, indent = 4)));
 
 def error_msg(msg):
-    output = {"exit_code": 0, "error_msg": msg[11: -2]};
+    output = {"exit_code": 0, "error_msg": msg[11: -2] if msg[:9] == "Exception" else msg};
     save_result(output);
     return jsonify(output);
 
