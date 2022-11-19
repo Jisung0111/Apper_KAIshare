@@ -284,7 +284,7 @@ def register(args):
         msg.attach(MIMEText(
             "Dear KAIshare Customer,\n" \
             "Your instant authentification code is below for KAIshare services.\n" \
-            "Verification Code: {}\n" \
+            "  Verification Code: {}\n" \
             "Please, fill out your authentification code on the application.\n  \n" \
             "Best Regards,\n  \n" \
             "KAIshare Administrator Team Apper".format(code)
