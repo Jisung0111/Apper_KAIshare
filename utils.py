@@ -183,7 +183,7 @@ UdtEvt_Contents = {
 Week_to_Sec = 7 * 24 * 3600;
 
 def init():
-    global db, cursor;
+    global db;
     db = pymysql.connect(host = 'localhost',
                          port = 3306,
                          user = 'Apper',
@@ -191,7 +191,6 @@ def init():
                          db = 'apper',
                          charset = 'utf8'
                         );
-    cursor = db.cursor();
     random.seed(int(1e8 * time.time() % 1e8));
     
     tables = [i[0] for i in result("SHOW TABLES")];
@@ -200,14 +199,19 @@ def init():
             create_table(table_name, Table_Contents[table_name]);
 
 def commit(sql, val = None):
+    cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
+    cursor.close();
     db.commit();
 
 def result(sql, val = None):
+    cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
-    return cursor.fetchall();
+    res = cursor.fetchall();
+    cursor.close();
+    return res;
 
 def create_table(table_name, table_contents):
     sql = "CREATE TABLE " + table_name + "(" + ",".join([" ".join(i) for i in table_contents]) + ")";
@@ -221,7 +225,7 @@ def save_result(args):
         f.write("output: {}\n\n".format(json.dumps(args, indent = 4)));
 
 def error_msg(msg):
-    output = {"exit_code": 0, "error_msg": msg[11: -2] if msg[:9] == "Exception" else msg};
+    output = {"exit_code": 0, "error_msg": msg[11: -2]};
     save_result(output);
     return jsonify(output);
 
