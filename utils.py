@@ -182,8 +182,8 @@ UdtEvt_Contents = {
 };
 Week_to_Sec = 7 * 24 * 3600;
 
-def init():
-    global db;
+def connect_db():
+    global db, Last_DB_Connection;
     db = pymysql.connect(host = 'localhost',
                          port = 3306,
                          user = 'Apper',
@@ -191,6 +191,10 @@ def init():
                          db = 'apper',
                          charset = 'utf8'
                         );
+    Last_DB_Connection = time.time();
+
+def init():
+    connect_db();
     random.seed(int(1e8 * time.time() % 1e8));
     
     tables = [i[0] for i in result("SHOW TABLES")];
@@ -199,6 +203,7 @@ def init():
             create_table(table_name, Table_Contents[table_name]);
 
 def commit(sql, val = None):
+    if time.time() - Last_DB_Connection > 300: connect_db();
     cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
@@ -206,6 +211,7 @@ def commit(sql, val = None):
     db.commit();
 
 def result(sql, val = None):
+    if time.time() - Last_DB_Connection > 300: connect_db();
     cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
