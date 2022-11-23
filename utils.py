@@ -180,7 +180,7 @@ UdtEvt_Contents = {
     "event-time": [float, "EventTime"],
     "num-member": [int, "NumMember", 2, 30000]
 };
-Week_to_Sec = 7 * 24 * 3600;
+TWeek_to_Sec = 14 * 24 * 3600;
 
 def connect_db():
     global db, Last_DB_Connection;
@@ -358,8 +358,8 @@ def get_comments(args):
 def post_event(args):
     if len(result("SELECT Email FROM UserInfo WHERE BINARY Email = %s", args["email"])) == 0:
         raise Exception("PostEvent: Who Are You? ({})".format(args["email"]));
-    if args["event-time"] < time.time() or time.time() + Week_to_Sec < args["event-time"]:
-        raise Exception("PostEvent: Event Time should be within 1 Week");
+    if args["event-time"] < time.time() or time.time() + TWeek_to_Sec < args["event-time"]:
+        raise Exception("PostEvent: Event Time should be within 2 Weeks");
     
     post_time = time.time();
     commit("INSERT INTO EventBoard(Email, Category, Title, Contents, Place, EventTime, PostingTime, NumMember) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
@@ -380,8 +380,8 @@ def update_event(args):
         type(args["turn-into"]).__name__, UdtEvt_Contents[args["to-change"]][0].__name__));
     if type(args["turn-into"]) is str and not chk_len(args["turn-into"], UdtEvt_Contents[args["to-change"]][2], UdtEvt_Contents[args["to-change"]][3]):
         raise Exception("UpdateEvent: Invalid {} (Length should be in [{}, {}])".format(UdtEvt_Contents[args["to-change"]][1: 4]));
-    if args["to-change"] == "event-time" and (args["turn-into"] < time.time() or time.time + Week_to_Sec < args["turn-into"]):
-        raise Exception("UpdateEvent: Event Time should be within 1 Week");
+    if args["to-change"] == "event-time" and (args["turn-into"] < time.time() or time.time + TWeek_to_Sec < args["turn-into"]):
+        raise Exception("UpdateEvent: Event Time should be within 2 Weeks");
     if args["to-change"] == "num-member":
         if args["turn-into"] < 2 or args["turn-into"] > 30000: raise Exception("UpdateEvent: Number of Member Should be in [2, 30000]");
         if args["turn-into"] < emlstscmb[0][2]:
