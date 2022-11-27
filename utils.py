@@ -102,6 +102,10 @@ Argument_Dict = {
         ["comment-start", int, "Querying Comments Start", 0, None],
         ["num-comment", int, "Number of Comments to Query", 1, None]
     ],
+    "CheckPoster": [
+        ["event-id", int, "Event ID", 0, None],
+        ["email", str, "Email", len("a@kaist.ac.kr"), 50]
+    ],
     "PostEvent": [
         ["email", str, "Email", len("a@kaist.ac.kr"), 50],
         ["category", str, "Category", 1, 50],
@@ -145,7 +149,7 @@ Argument_Dict = {
     "DeleteComment": [
         ["email", str, "Email", len("a@kaist.ac.kr"), 50],
         ["event-id", int, "Event ID", 0, None],
-        ["comment-id", str, "Comment ID", 0, None]
+        ["comment-id", int, "Comment ID", 0, None]
     ],
     "UpdateUserInfo": [
         ["email", str, "Email", len("a@kaist.ac.kr"), 50],
@@ -158,6 +162,9 @@ Argument_Dict = {
         ["table", str, "Table", 1, 100]
     ],
     "GetTables": [
+    ],
+    "GetTableColumn": [
+        ["table", str, "Table", 1, 100]
     ],
     "AddUserInfo": [
         ["email", str, "Email", len("a@kaist.ac.kr"), 50],
@@ -231,7 +238,7 @@ def save_result(args):
         f.write("output: {}\n\n".format(json.dumps(args, indent = 4)));
 
 def error_msg(msg):
-    output = {"exit_code": 0, "error_msg": msg[11: -2]};
+    output = {"exit_code": 0, "error_msg": msg[11: -2] if msg[:9] == "Exception" else msg};
     save_result(output);
     return jsonify(output);
 
@@ -248,7 +255,7 @@ def chk_args(args, func_name):
     for arg in Argument_Dict[func_name]:
         if arg[0] not in args: raise Exception("{}: Invalid Arguments".format(func_name));
         if arg[1] is None: continue;
-        if type(args[arg[0]]) is not arg[1]:
+        if type(args[arg[0]]) is not arg[1] and not (type(args[arg[0]]) is int and arg[1] is float):
             raise Exception("{}: Type of {} should be {} (Input: {})".format(
                             func_name, arg[2], arg[1].__name__.upper(), type(args[arg[0]]).__name__.upper()));
         # type is one of str, float, int
@@ -329,22 +336,25 @@ def get_categories(args):
     return success([i[0] for i in result("SELECT DISTINCT Category FROM EventBoard")]);
 
 def get_board_list(args):
-    sql = "SELECT EventID, Email, Category, Title, Place, EventTime, NumMember, CurMember FROM EventBoard WHERE Status = 1 AND ";
-    if len(args["text"]) != 0: sql += "(BINARY Title LIKE %{}% OR BINARY Contents LIKE %{}%) AND ".format(args["text"], args["text"]);
+    sql = "SELECT EventID, Email, Category, Title, Contents, Place, EventTime, NumMember, CurMember FROM EventBoard WHERE Status = 1 AND ";
+    if len(args["search-word"]) != 0: sql += "(BINARY Title LIKE %{}% OR BINARY Contents LIKE %{}%) AND ".format(args["search-word"], args["search-word"]);
     if args["category"] != "##ALL##": sql += "BINARY Category = '{}' AND ".format(args["category"]);
     if args["place"] != "##ALL##": sql += "BINARY Place = '{}' AND ".format(args["place"]);
     if args["period-start"] != 0: sql += "EventTime >= {} AND ".format(args["period-start"]);
     if args["period-end"] != 0: sql += "EventTime <= {} AND ".format(args["period-end"]);
-    sql = sql[:-4] + "LIMIT {}, {} ORDER BY EventTime DESC".format(args["event-start"], args["num-event"]);
+    sql = sql[:-4] + "ORDER BY EventTime DESC LIMIT {}, {}".format(args["event-start"], args["num-event"]);
     return success([list(i) for i in result(sql)]);
     
 def get_event_info(args):
-    event_info = result("SELECT Email, Category, Contents, Place, EventTime, PostingTime, Status, NumMember, CurMember"
+    event_info = result("SELECT Email, Category, Title, Contents, Place, EventTime, PostingTime, Status, NumMember, CurMember "
                         "FROM EventBoard WHERE EventID = %s", args["event-id"]);
     if len(event_info) == 0: raise Exception("GetEventInfo: NOT Existing Event ID ({})".format(args["event-id"]));
     
-    keys = ["uploader_email", "category", "content", "place", "event_time", "posting_time", "status", "num_member", "cur_member"];
+    keys = ["email", "category", "title", "content", "place", "event_time", "posting_time", "status", "num_member", "cur_member"];
     data = {key: val for key, val in zip(keys, event_info[0])};
+    username = result("SELECT Username FROM UserInfo WHERE BINARY Email = %s", data["email"]);
+    if len(username) == 0: raise Exception("GetEventInfo: NOT Existing Poster Email ({})  BackEnd Problem".format(data["email"]));
+    data["username"] = username[0][0];
     data["members"] = [list(i) for i in result("SELECT Email, Username FROM Member WHERE EventID = %s", args["event-id"])];
     return success(data);
 
@@ -353,7 +363,13 @@ def get_comments(args):
         raise Exception("GetComments: Wrong Event ID ({})".format(args["event-id"]));
     
     return success([list(i) for i in result("SELECT CommentID, Email, Username, Comment, Time FROM Comment "
-        "WHERE EventID = %s LIMIT %s, %s ORDER BY Time DESC", (args["event-id"], args["comment-start"], args["num-comment"]))]);
+        "WHERE EventID = %s ORDER BY Time DESC LIMIT %s, %s", (args["event-id"], args["comment-start"], args["num-comment"]))]);
+
+def check_poster(args):
+    email = result("SELECT Email FROM EventBoard WHERE EventID = %s", args["event-id"]);
+    if len(email) == 0: raise Exception("CheckPoster: Wrong Event ID ({})".format(args["event-id"]));
+    
+    return success("T" if email[0][0] == args["email"] else "F");
 
 def post_event(args):
     if len(result("SELECT Email FROM UserInfo WHERE BINARY Email = %s", args["email"])) == 0:
@@ -394,14 +410,14 @@ def join_event(args):
     stanum = result("SELECT Status, NumMember, CurMember FROM EventBoard WHERE EventID = %s", args["event-id"]);
     if len(stanum) == 0: raise Exception("JoinEvent: Wrong Event ID ({})".format(args["event-id"]));
     if stanum[0][0] == 0: raise Exception("JoinEvent: Event is Closed");
-    if stanum[0][1] >= stanum[0][2]: raise Exception("JoinEvent: Members are Full");
+    if stanum[0][1] <= stanum[0][2]: raise Exception("JoinEvent: Members are Full");
     
     if len(result("SELECT Email FROM Member WHERE EventID = %s AND BINARY Email = %s", (args["event-id"], args["email"]))) != 0:
         raise Exception("JoinEvent: Already Joining the Event");
     
     commit("INSERT INTO Member (EventID, Email, Username) VALUES (%s, %s, %s)",
            (args["event-id"], args["email"], result("SELECT Username FROM UserInfo WHERE BINARY Email = %s", args["email"])[0][0]));
-    commit("UPDATE EventID SET CurMember = %s WHERE EventID = %s", (stanum[0][2] + 1, args["event-id"]));
+    commit("UPDATE EventBoard SET CurMember = %s WHERE EventID = %s", (stanum[0][2] + 1, args["event-id"]));
     return success();
 
 def leave_event(args):
@@ -414,7 +430,7 @@ def leave_event(args):
         raise Exception("LeaveEvent: Already NOT Joining the Event");
     
     commit("DELETE FROM Member WHERE EventID = %s AND BINARY Email = %s", (args["event-id"], args["email"]));
-    commit("UPDATE EventID SET CurMember = %s WHERE EventID = %s", (stanum[0][2] - 1, args["event-id"]));
+    commit("UPDATE EventBoard SET CurMember = %s WHERE EventID = %s", (stanum[0][2] - 1, args["event-id"]));
     return success();
 
 def close_event(args):
@@ -501,6 +517,10 @@ def get_table_entries(args):
 
 def get_tables(args = None):
     return success([i[0] for i in result("SHOW TABLES")]);
+
+def get_table_column(args):
+    if args["table"] not in [i[0] for i in result("SHOW TABLES")]: raise("GetTableColumn: NOT Existing Table ({})".format(args["table"]));
+    return success([list(i) for i in result("SHOW FULL COLUMNS FROM " + args["table"])]);
 
 def add_userinfo(args):
     username = args["username"] if "username" in args else "Anonymous";
