@@ -38,13 +38,20 @@ app = Flask(__name__);
 
 @app.route('/resource', methods = ['GET', 'POST'])
 def method():
-    with open("Addr.pkl", "rb") as f: addrs = pickle.load(f);
-    addrs[request.remote_addr] = addrs.get(request.remote_addr, []) + \
-                                 [(time.time(), request.method)];
-    with open("Addr.pkl", "wb") as f: pickle.dump(addrs, f);
+    while True:
+        with open("status", "r") as f: status = f.readline();
+        if status == "work": time.sleep(0.02);
+        else:
+            with open("status", "w") as f: f.write("work");
+            break;
     
-    if request.method == 'POST':
-        try:
+    try:
+        with open("Addr.pkl", "rb") as f: addrs = pickle.load(f);
+        addrs[request.remote_addr] = addrs.get(request.remote_addr, []) + \
+                                    [(time.time(), request.method)];
+        with open("Addr.pkl", "wb") as f: pickle.dump(addrs, f);
+        
+        if request.method == 'POST':
             args = request.get_json();
             if type(args) is not dict: args = json.loads(args);
             
@@ -80,10 +87,13 @@ def method():
             utils.chk_args(args["argument"], args["function-name"]);
             return Funcs[args["function-name"]](args["argument"]);
 
-        except Exception as e:
-            return utils.error_msg(repr(e));
-    
-    else: return utils.success();
+        else: return "Hello, world!";
+
+    except Exception as e:
+        return utils.error_msg(repr(e));
+        
+    finally:
+        with open("status", "w") as f: f.write("rest");
 
 if __name__ == "__main__":
     utils.init();
