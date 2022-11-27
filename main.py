@@ -1,7 +1,8 @@
 from flask import Flask, request
 import utils
 import json
-import datetime
+import time, datetime
+import pickle
 
 Funcs = {
     "Login": utils.login,
@@ -11,6 +12,7 @@ Funcs = {
     "GetBoardList": utils.get_board_list,
     "GetEventInfo": utils.get_event_info,
     "GetComments": utils.get_comments,
+    "CheckPoster": utils.check_poster,
     "PostEvent": utils.post_event,
     "UpdateEvent": utils.update_event,
     "JoinEvent": utils.join_event,
@@ -26,6 +28,7 @@ Funcs = {
 Admin_Funcs = {
     "GetTableEntries": utils.get_table_entries,
     "GetTables": utils.get_tables,
+    "GetTableColumn": utils.get_table_column,
     "AddUserInfo": utils.add_userinfo,
     "DeleteUserInfo": utils.delete_userinfo,
     "InitTable": utils.init_table
@@ -33,8 +36,13 @@ Admin_Funcs = {
 
 app = Flask(__name__);
 
-@app.route('/resource', methods = ['POST'])
+@app.route('/resource', methods = ['GET', 'POST'])
 def method():
+    with open("Addr.pkl", "rb") as f: addrs = pickle.load(f);
+    addrs[request.remote_addr] = addrs.get(request.remote_addr, []) + \
+                                 [(time.time(), request.method)];
+    with open("Addr.pkl", "wb") as f: pickle.dump(addrs, f);
+    
     if request.method == 'POST':
         try:
             args = request.get_json();
@@ -67,13 +75,15 @@ def method():
                 return Funcs[args["function-name"]](args["user-info"]);
             
             if "argument" not in args: raise Exception("Input: Invalid Arguments");
-            utils.chk_args(args, "UserInfoCheck");
+            utils.chk_args(args["user-info"], "UserInfoCheck");
             utils.chk_register(args["user-info"], args["function-name"]);
             utils.chk_args(args["argument"], args["function-name"]);
             return Funcs[args["function-name"]](args["argument"]);
 
         except Exception as e:
             return utils.error_msg(repr(e));
+    
+    else: return utils.success();
 
 if __name__ == "__main__":
     utils.init();
