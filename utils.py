@@ -456,8 +456,8 @@ def disable_event(args):
     if len(poster_email) == 0: raise Exception("DisableEvent: Wrong Event ID ({})".format(args["event-id"]));
     if poster_email[0][0] != args["email"]: raise Exception("DisableEvent: Permission Denied (NOT Event Poster)");
     
-    commit("DROP TABLE Member" + str(args["event-id"]));
-    commit("DROP TABLE Comment" + str(args["event-id"]));
+    commit("DELETE FROM Member WHERE EventID = %s", args["event-id"]);
+    commit("DELETE FROM Comment WHERE EventID = %s", args["event-id"]);
     commit("DELETE FROM EventBoard WHERE EventID = %s", args["event-id"]);
     return success();
 
