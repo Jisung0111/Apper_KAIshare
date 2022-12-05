@@ -2,7 +2,6 @@ from flask import Flask, request
 import utils
 import json
 import time, datetime
-import pickle
 
 Funcs = {
     "Login": utils.login,
@@ -40,17 +39,12 @@ app = Flask(__name__);
 def method():
     while True:
         with open("status", "r") as f: status = f.readline();
-        if status == "work": time.sleep(0.02);
+        if status != "rest": time.sleep(0.02);
         else:
             with open("status", "w") as f: f.write("work");
             break;
     
     try:
-        with open("Addr.pkl", "rb") as f: addrs = pickle.load(f);
-        addrs[request.remote_addr] = addrs.get(request.remote_addr, []) + \
-                                    [(time.time(), request.method)];
-        with open("Addr.pkl", "wb") as f: pickle.dump(addrs, f);
-        
         if request.method == 'POST':
             args = request.get_json();
             if type(args) is not dict: args = json.loads(args);
