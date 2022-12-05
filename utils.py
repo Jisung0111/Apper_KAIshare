@@ -9,6 +9,7 @@ import json
 
 Status_Dict = {"Closed": 0, "Open": 1};
 Log_Saving_file = "Log.txt";
+DB_Refresh_Time = 10;
 
 Table_Contents = {
     "Register": [
@@ -210,7 +211,7 @@ def init():
             create_table(table_name, Table_Contents[table_name]);
 
 def commit(sql, val = None):
-    if time.time() - Last_DB_Connection > 300: connect_db();
+    if time.time() - Last_DB_Connection > DB_Refresh_Time: connect_db();
     cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
@@ -218,7 +219,7 @@ def commit(sql, val = None):
     db.commit();
 
 def result(sql, val = None):
-    if time.time() - Last_DB_Connection > 300: connect_db();
+    if time.time() - Last_DB_Connection > DB_Refresh_Time: connect_db();
     cursor = db.cursor();
     if val is None: cursor.execute(sql);
     else: cursor.execute(sql, val);
@@ -337,7 +338,8 @@ def get_categories(args):
 
 def get_board_list(args):
     sql = "SELECT EventID, Email, Category, Title, Contents, Place, EventTime, NumMember, CurMember FROM EventBoard WHERE Status = 1 AND ";
-    if len(args["search-word"]) != 0: sql += "(BINARY Title LIKE %{}% OR BINARY Contents LIKE %{}%) AND ".format(args["search-word"], args["search-word"]);
+    if len(args["search-word"]) != 0: sql += "(REPLACE(Title, ' ', '') LIKE '%{}%' OR REPLACE(Contents, ' ', '') LIKE '%{}%') AND ".format(
+                                              args["search-word"].replace(" ", ""), args["search-word"].replace(" ", ""));
     if args["category"] != "##ALL##": sql += "BINARY Category = '{}' AND ".format(args["category"]);
     if args["place"] != "##ALL##": sql += "BINARY Place = '{}' AND ".format(args["place"]);
     if args["period-start"] != 0: sql += "EventTime >= {} AND ".format(args["period-start"]);
@@ -476,8 +478,10 @@ def delete_comment(args):
     if len(status) == 0: raise Exception("DeleteComment: Wrong Event ID ({})".format(args["event-id"]));
     if status[0][0] == 0: raise Exception("DeleteComment: Event is Closed");
     
-    if len(result("SELECT CommentID FROM Comment WHERE CommentID = %s", args["comment-id"])) == 0:
-        raise Exception("DeleteComment: NOT Existing Comment");
+    email = result("SELECT Email FROM Comment WHERE CommentID = %s", args["comment-id"]);
+    if len(email) == 0: raise Exception("DeleteComment: NOT Existing Comment");
+    if email[0][0] != args["email"]: raise Exception("DeleteComment: Permission Denied (NOT Commenter)");
+    
     commit("DELETE FROM Comment WHERE CommentID = %s", args["comment-id"]);
     return success();
 
