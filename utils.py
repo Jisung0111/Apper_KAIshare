@@ -9,7 +9,7 @@ import json
 
 Status_Dict = {"Closed": 0, "Open": 1};
 Log_Saving_file = "Log.txt";
-DB_Refresh_Time = 10;
+DB_Refresh_Time = 3;
 
 Table_Contents = {
     "Register": [
